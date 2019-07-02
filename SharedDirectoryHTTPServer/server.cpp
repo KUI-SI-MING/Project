@@ -25,12 +25,17 @@ class HttpServer
       }
       cout << "---------------------------RecvHttpHeader is success!\n";
       //解析HTTP头部
+      if(hreq.PraseHttpHeader(info) == false)
+      {
+        goto out;
+      }
+      cout << "---------------------------PraseHttpHeader is success!\n";
       //判断请求是否是CGI请求
       
       close(sock);
       return true;
 out:
-      hres.ErrHandler(info);
+      //hres.ErrHandler(info);
       close(sock);
       return false;
     }
@@ -38,6 +43,12 @@ out:
   public:
     HttpServer():_server_sock(-1), _tp(nullptr)
   {}
+
+    //TCP服务器的初始化以及线程的初始化
+    bool HttpServerInit(string ip, string port)
+    {
+
+    }
 
 };
 

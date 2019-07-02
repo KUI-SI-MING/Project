@@ -9,11 +9,54 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <queue>
+#include <pthread.h>
 
 using namespace std;
 
 #define MAX_HTTPHEADER 4096
+#define WWWROOT "www"
+#define MAX_PATH 256
+#define LOG(...)do{\
+  fprintf(stdout,__VA_ARGS__);\
+}while(0)
 
+class Utils
+{
+  public:
+    static int Divide(string& src, const string& seg, vector<string>& list)
+    {
+      //分割多少数据
+      int count = 0;
+      size_t idx = 0;//起始位置
+      size_t poss = 0;// \r\n的位置
+      
+      while(idx < src.length())
+      {
+        poss = src.find(seg, idx);
+        if(poss == string::npos)
+        {
+          break;
+        }
+
+        list.push_back(src.substr(idx, poss - idx));
+        count++;
+        idx = poss + seg.length();
+      }
+
+      //最后一条信息
+      if(idx < seg.length())
+      {
+        list.push_back(seg.substr(idx, poss - idx));
+        count++;
+      }
+
+      return count;
+    }
+
+};
 
 //HTTPRequest解析出的请求信息
 class ResquestInformation
@@ -116,6 +159,137 @@ class HttpRequest
       }
       return true;
     }
+
+    
+    bool PraseFirstLine(string& line, ResquestInformation& info)
+    {
+      vector<string> line_list;
+      if(Utils::Divide(line, " ", line_list) != 3)
+      {
+        info._error_code = "400";
+        return false;
+      }
+
+      //打印取出的首行成分
+      cout << "\n\n\n\n";
+      for(size_t i = 0;i < line_list.size();i++)
+      {
+        cout << line_list[i] << endl;
+      }
+      cout << "\n\n\n\n";
+
+      string url;
+      info._method = line_list[0];
+      url = line_list[1];
+      info._version = line_list[2];
+
+      if(info._method != "GET" && info._method != "POST" && info._method != "HEAD")
+      {
+        info._error_code = "405";
+        return false;
+      }
+
+      if(info._version != "HTTP/0.9" && info._version != "HTTP/1.0" && info._version != "HTTP/1.1")
+      {
+        info._error_code = "400";
+        return false;
+      }
+
+      //解析URL
+      //url: /upload?key=val&key=val
+      size_t pos = 0;
+      pos = url.find("?");
+      if(pos == string::npos)
+      {
+        info._path_info = url;
+      }
+      else
+      {
+        info._path_info = url.substr(0, pos);
+        info._inquire_string = url.substr(pos + 1);
+      }
+
+      PathIsLeagal(info._path_info, info);
+      //realpath()将相对路径转换为绝对路径,若不存在则直接奔溃
+      //info._path_physic = WWWROOT + info._path_info;
+      
+      return true;
+    }
+
+    //判断地址是否合法,并将相对路径转换为绝对路径
+    bool PathIsLeagal(string& path, ResquestInformation& info)
+    {
+      //GET / HTTP/1.1
+      //file = www/
+      string file = WWWROOT + path;
+
+      //打印文件路径
+      cout << "\n\n\n\n";
+      cout << file << "\n\n\n\n";
+
+      //文件存在，就将相对路径转换为绝对路径
+      char tmp[MAX_PATH] = {0};
+      //使用realpath函数将虚拟路径转换为物理路径,自动去掉最后面的/
+      realpath(file.c_str(), tmp);
+
+      info._path_physic = tmp;
+      //判断相对路径,防止出现将相对路径改为绝对路径时,绝对路径中没有根目录,也就是没有访问权限
+      if(info._path_physic.find(WWWROOT) == string::npos)
+      {
+        info._error_code = "403";
+        return false;
+      }
+
+      //stat函数，通过路径获取文件信息
+      //stat函数需要物理路径来获取文件的信息,
+      if(stat(info._path_physic.c_str(), &(info._st)) < 0)
+      {
+        info._error_code = "404";
+        return false;
+      }
+
+      return true;
+    }
+
+    bool PraseHttpHeader(ResquestInformation& info)
+    {
+      //HTTP请求头解析
+      //请求方法 URL 协议版本\r\n
+      //key:val\r\nkey:val
+      vector<string> head_list;//头信息的数组
+      Utils::Divide(_http_header, "\r\n", head_list);
+      
+      //打印出被分割的头部信息
+      for(size_t i = 0;i < head_list.size();i++)
+      {
+        cout << head_list[i] << endl;
+      }
+      cout << "\n\n\n\n";
+
+      PraseFirstLine(head_list[0], info);
+      //删除首行
+      head_list.erase(head_list.begin());
+      //存放所有的key:val 键值对
+      for(size_t i = 1;i < head_list.size();i++)
+      {
+        size_t pos = head_list[i].find(": ");
+        info._head_list[head_list[i].substr(0, pos)] = head_list[i].substr(pos + 2);
+      }
+
+      //打印存放后的头部
+      for(auto it = info._head_list.begin();it != info._head_list.end();it++)
+      {
+        cout << '[' << it->first << ']' << ' '  << '[' << it->second << ']';
+      }
+      cout << "\n\n\n\n";
+      //若是测试打印出错，返回页面"404"
+      //info._error_code = "404";
+      //return false;
+      
+      return true;
+    }
+
+    ResquestInformation& GetRequestInfo();
 };
 
 //文件请求接口
