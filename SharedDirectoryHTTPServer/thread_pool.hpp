@@ -108,7 +108,7 @@ class ThreadPool
       {
         ThreadPool* tp = (ThreadPool*)arg;
         tp->QueueLock();
-        while(tp->QueueIsEmpty)
+        while(tp->QueueIsEmpty())
         {
           tp->ThreadWait();
         }
@@ -118,5 +118,76 @@ class ThreadPool
         tp->QueueUnLock();
       }
       return nullptr;
+    }
+
+  public:
+    ThreadPool(int max):_max_thr(max), _cur_thr(0), _is_stop(false)
+  {}
+
+    ~ThreadPool()
+    {
+      pthread_mutex_destroy(&_mutex);
+      pthread_cond_destroy(&_cond);
+    }
+
+    //线程创建，互斥锁，条件变量初始化
+    bool ThreadPoolInit()
+    {
+      cout << "------------------------ThreadPool Initing........." << endl;
+      pthread_t tid;
+
+      for(int i = 0;i < _max_thr;i++)
+      {
+        int ret = pthread_create(&tid, nullptr, thread_start, this);
+        if(ret != 0)
+        {
+          LOG("Thread create filed!\n");
+          return false;
+        }
+
+        pthread_detach(tid);
+        _cur_thr++;
+      }
+
+      pthread_mutex_init(&_mutex, nullptr);
+      pthread_cond_init(&_cond, nullptr);
+
+      return true;
+    }
+
+    //线程安全的任务入队
+    bool PushTask(HttpTask& tt)
+    {
+      QueueLock();
+      _task_queue.push(tt);
+      ThreadWakeUpOne();
+      QueueUnLock();
+      return true;
+    }
+
+    //线程安全的任务出队
+    bool PopTask(HttpTask& tt)
+    {
+      //出队之前在线程接口中会加锁，所以这里无需加锁
+      tt = _task_queue.front();
+      _task_queue.pop();
+
+      return true;
+    }
+
+    //销毁线程池
+    bool ThreadDestory()
+    {
+      if(!IsStop())
+      {
+        _is_stop = true;
+      }
+
+      while(_cur_thr > 0)
+      {
+        ThreadWeakUpAll();
+      }
+
+      return true;
     }
 };
