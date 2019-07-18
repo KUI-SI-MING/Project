@@ -57,7 +57,7 @@ class Utils
     static int Divide(string& src, const string& seg, vector<string>& list)
     {
       //分割多少数据
-      int count = 0;
+      int num = 0;
       size_t idx = 0;//起始位置
       size_t poss = 0;// \r\n的位置
       
@@ -70,7 +70,7 @@ class Utils
         }
 
         list.push_back(src.substr(idx, poss - idx));
-        count++;
+        num++;
         idx = poss + seg.length();
       }
 
@@ -78,10 +78,10 @@ class Utils
       if(idx < seg.length())
       {
         list.push_back(seg.substr(idx, poss - idx));
-        count++;
+        num++;
       }
 
-      return count;
+      return num;
     }
 
     //gmtime 将一个时间戳转换为一个结构体
@@ -115,6 +115,13 @@ class Utils
       stringstream ss;
       ss << num;
       return ss.str();
+    }
+
+    static void DigitToStrFsize(double num, string& str)
+    {
+      stringstream ss;
+      ss << num;
+      str = ss.str();
     }
 
     //通过文件路径获取文件类型
@@ -247,7 +254,7 @@ class HttpRequest
           return false;
         }
         //当读字节数小于MAX_HTTPHEADER，且没有空行出现,说明数据还没有从发送端发送完,所以接收缓冲区需要等待一下再次读取数据
-        else if(ptr == nullptr && ret < MAX_HTTPHEADER)
+        else if((ptr == nullptr) && (ret < MAX_HTTPHEADER))
         {
           usleep(1000);
           continue;
@@ -259,7 +266,7 @@ class HttpRequest
         //将缓冲区的所有头部删除
         recv(_client_sock, head, head_len + 4, 0);
         
-        LOG("------------------------In RecvHttpHeader\n%s\n", _http_header.c_str());
+        LOG("------------------------In RecvHttpHeader:\n%s\n", _http_header.c_str());
         break;
       }
       return true;
@@ -276,13 +283,13 @@ class HttpRequest
       }
 
       //打印取出的首行成分
-      cout << "\n\n\n\n";
-      for(size_t i = 0;i < line_list.size();i++)
-      {
-        cout << line_list[i] << endl;
-      }
-      cout << "\n\n\n\n";
-
+//      cout << "\n\n\n\n";
+//      for(size_t i = 0;i < line_list.size();i++)
+//      {
+//        cout << line_list[i] << endl;
+//      }
+//      cout << "\n\n\n\n";
+//
       string url;
       info._method = line_list[0];
       url = line_list[1];
@@ -358,6 +365,7 @@ class HttpRequest
 
     bool PraseHttpHeader(ResquestInformation& info)
     {
+      //cout << "-----------------------In PraseHttpHeader:\n";
       //HTTP请求头解析
       //请求方法 URL 协议版本\r\n
       //key:val\r\nkey:val
@@ -365,15 +373,15 @@ class HttpRequest
       Utils::Divide(_http_header, "\r\n", head_list);
       
       //打印出被分割的头部信息
-      for(size_t i = 0;i < head_list.size();i++)
-      {
-        cout << head_list[i] << endl;
-      }
-      cout << "\n\n\n\n";
+      //binfor(size_t i = 0;i < head_list.size();i++)
+      //{
+      // cout << head_list[i] << endl;
+      //}
+      //cout << "\n\n\n\n";
 
       PraseFirstLine(head_list[0], info);
       //删除首行
-      head_list.erase(head_list.begin());
+      //head_list.erase(head_list.begin());
       //存放所有的key:val 键值对
       for(size_t i = 1;i < head_list.size();i++)
       {
@@ -381,13 +389,13 @@ class HttpRequest
         info._head_list[head_list[i].substr(0, pos)] = head_list[i].substr(pos + 2);
       }
 
-      //打印存放后的头部
-      for(auto it = info._head_list.begin();it != info._head_list.end();it++)
-      {
-        cout << '[' << it->first << ']' << ' '  << '[' << it->second << ']';
-      }
-      cout << "\n\n\n\n";
-      //若是测试打印出错，返回页面"404"
+//      //打印存放后的头部
+//      for(auto it = info._head_list.begin();it != info._head_list.end();it++)
+//      {
+//        cout << '[' << it->first << ']' << ' '  << '[' << it->second << ']';
+//      }
+//      cout << "\n\n\n\n";
+//      //若是测试打印出错，返回页面"404"
       //info._error_code = "404";
       //return false;
       
@@ -457,8 +465,7 @@ class HttpResponse
     //0\r\n\r\n 发送最后一个分块
     bool SendCDate(const string& buf)
     {
-      if(buf.empty())
-      {
+      if(buf.empty()){
         //最后一个分块
         SendDate("0\r\n\r\n");
       }
@@ -775,12 +782,17 @@ class HttpResponse
       if(info._st.st_mode & S_IFDIR)
       {
         if(info._path_info.back() != '/')
+        {
           info._path_info.push_back('/');
+        }
         if(info._path_physic.back() != '/')
+        {
           info._path_physic.push_back('/');
+        }
         return true;
       }
-
+      
+      cout << "=============File is not dir~=======\n";
       return false;
     }
 
@@ -821,7 +833,8 @@ class HttpResponse
       rsp_body += "<meta charset='UTF-8'>";
       rsp_body += "<h1>Index of ";
       rsp_body += info._path_info;
-      rsp_body += "</h1></head><link rel=\"shortcut ico\n\", href=\"/favicon.ico\" /><body>";
+      //rsp_body += "</h1></head>/*<link rel=\"shortcut ico\n\", href=\"/favicon.ico\" /><body>";
+      rsp_body += "</h1></head><body>";
       
       //<hr />是一个横线
       //rsp_body += "<h1>Welocome to my server";

@@ -252,7 +252,7 @@ public:
           //将boundary之前的数据写入文件,将数据从buf中移除
           //关闭文件
           //看middle_boundary是否有文件名
-          WriteFile(bhf, boundary_pos);
+          WriteFile(buf,boundary_pos);
           CloseFile();
 
           //将数据从buf移除
